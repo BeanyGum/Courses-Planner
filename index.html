@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="A drag-and-drop degree planner: lay out remaining courses across semesters, validate prerequisite order, and stay under your credit-hour cap each term.">
+<title>Course Plan — Degree Roadmap</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%232C5C86'/%3E%3Cpath d='M50 22 L86 38 L50 54 L14 38 Z' fill='%23F7F5EE'/%3E%3Cpath d='M28 46 L28 66 Q50 78 72 66 L72 46' fill='none' stroke='%23F7F5EE' stroke-width='5'/%3E%3Cline x1='86' y1='38' x2='86' y2='62' stroke='%23F7F5EE' stroke-width='4'/%3E%3Ccircle cx='86' cy='66' r='4' fill='%23F7F5EE'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F7F5EE;
+    --paper-raised:#FFFFFF;
+    --grid:#E2DECE;
+    --ink:#1C2B3A;
+    --ink-soft:#5B6B7A;
+    --blueprint:#2C5C86;
+    --blueprint-deep:#1F4663;
+    --circuit-green:#3C7A5A;
+    --signal-amber:#C77D11;
+    --alert-red:#B33A3A;
+    --card-bg:#FFFFFF;
+    --radius:10px;
+    --radius-sm:6px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0/100% 28px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0/28px 100%,
+      var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  ::selection{background:var(--blueprint);color:#fff;}
+
+  button{font-family:inherit;cursor:pointer;}
+  input,select{font-family:inherit;}
+
+  .wrap{max-width:1280px;margin:0 auto;padding:28px 24px 64px;}
+
+  /* ---------- Header ---------- */
+  .hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:18px;}
+  .hdr-title{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+  .hdr h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:28px;font-weight:700;letter-spacing:-0.01em;margin:0;color:var(--blueprint-deep);
+  }
+  .hdr .tag{
+    font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft);
+    border:1px solid var(--grid);padding:2px 7px;border-radius:4px;background:var(--paper-raised);
+  }
+  .hdr p.sub{margin:4px 0 0;color:var(--ink-soft);font-size:13.5px;max-width:560px;line-height:1.5;}
+  .save-indicator{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;white-space:nowrap;padding-top:6px;}
+  .save-dot{width:6px;height:6px;border-radius:50%;background:var(--circuit-green);}
+  .save-dot.saving{background:var(--signal-amber);}
+  .save-dot.error{background:var(--alert-red);}
+
+  /* ---------- Toolbar / settings ---------- */
+  .toolbar{
+    display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+    background:var(--paper-raised);border:1px solid var(--grid);border-radius:var(--radius);
+    padding:12px 14px;margin-bottom:14px;
+  }
+  .toolbar .grp{display:flex;align-items:center;gap:8px;}
+  .toolbar label{font-size:12px;color:var(--ink-soft);font-weight:500;}
+  .num-input{
+    width:64px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;
+    border:1px solid var(--grid);border-radius:var(--radius-sm);padding:6px 8px;color:var(--ink);background:var(--paper);
+  }
+  .num-input:focus, .text-input:focus{outline:2px solid var(--blueprint);outline-offset:1px;border-color:var(--blueprint);}
+  .divider{width:1px;height:22px;background:var(--grid);margin:0 2px;}
+  .spacer{flex:1;}
+
+  .btn{
+    display:inline-flex;align-items:center;gap:6px;
+    border:1px solid var(--grid);background:var(--paper-raised);color:var(--ink);
+    padding:7px 13px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;
+    transition:border-color .15s, background .15s, color .15s;
+  }
+  .btn:hover{border-color:var(--blueprint);color:var(--blueprint-deep);}
+  .btn:focus-visible{outline:2px solid var(--blueprint);outline-offset:1px;}
+  .btn-primary{background:var(--blueprint);color:#fff;border-color:var(--blueprint);}
+  .btn-primary:hover{background:var(--blueprint-deep);border-color:var(--blueprint-deep);color:#fff;}
+  .btn-ghost{background:transparent;border-color:transparent;color:var(--ink-soft);}
+  .btn-ghost:hover{color:var(--alert-red);border-color:transparent;background:rgba(179,58,58,.07);}
+  .btn-sm{padding:4px 9px;font-size:12px;}
+  .btn[disabled]{opacity:.45;cursor:not-allowed;}
+  .btn[disabled]:hover{border-color:var(--grid);color:var(--ink);}
+
+  /* ---------- Stats strip ---------- */
+  .stats{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:18px;}
+  .stat{display:flex;flex-direction:column;gap:2px;min-width:90px;}
+  .stat .v{font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;color:var(--blueprint-deep);}
+  .stat .l{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+  .stat.warn .v{color:var(--signal-amber);}
+  /* ---------- Parts bin ---------- */
+  .section-label{
+    font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--ink-soft);
+    text-transform:uppercase;letter-spacing:.05em;margin:22px 0 8px;display:flex;align-items:center;gap:10px;
+  }
+  .section-label .count{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--blueprint);}
+  .bin{
+    display:flex;gap:10px;flex-wrap:wrap;min-height:64px;
+    background:repeating-linear-gradient(135deg, rgba(44,92,134,.05) 0 10px, transparent 10px 20px);
+    border:1.5px dashed var(--grid);border-radius:var(--radius);padding:12px;
+    transition:border-color .15s, background .15s;
+  }
+  .bin.dragover{border-color:var(--blueprint);background:rgba(44,92,134,.08);}
+  .bin-empty{color:var(--ink-soft);font-size:13px;padding:8px 4px;}
+
+  /* ---------- Course card ---------- */
+  .card{
+    background:var(--card-bg);border:1px solid var(--grid);border-left:3px solid var(--circuit-green);
+    border-radius:var(--radius-sm);padding:8px 10px;width:168px;flex:0 0 auto;
+    cursor:grab;position:relative;transition:box-shadow .15s, transform .1s;
+  }
+  .card.bin-card{width:150px;}
+  .card:hover{box-shadow:0 3px 10px rgba(28,43,58,.1);}
+  .card.dragging{opacity:.35;}
+  .card.issue{border-left-color:var(--signal-amber);}
+  .card.insert-before{outline:2px dashed var(--blueprint);outline-offset:2px;}
+  .card .row1{display:flex;justify-content:space-between;align-items:baseline;gap:6px;}
+  .card .code{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;color:var(--blueprint-deep);}
+  .card .ch{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft);background:var(--paper);border:1px solid var(--grid);border-radius:4px;padding:1px 5px;}
+  .card .name{font-size:11.5px;color:var(--ink-soft);margin-top:3px;line-height:1.3;min-height:14px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .card .prereq-line{margin-top:5px;font-size:10.5px;color:var(--ink-soft);display:flex;align-items:center;gap:4px;}
+  .card .prereq-line .dot{width:6px;height:6px;border-radius:50%;flex:0 0 auto;background:var(--circuit-green);}
+  .card.issue .prereq-line .dot{background:var(--signal-amber);}
+  .card-actions{position:absolute;top:4px;right:4px;display:none;gap:2px;}
+  .card:hover .card-actions{display:flex;}
+  .icon-btn{width:18px;height:18px;border:none;background:var(--paper-raised);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);padding:0;}
+  .icon-btn:hover{color:var(--blueprint);background:var(--paper);}
+  .icon-btn.del:hover{color:var(--alert-red);}
+
+  /* ---------- Board ---------- */
+  .board{display:flex;gap:14px;overflow-x:auto;padding-bottom:14px;}
+  .board::-webkit-scrollbar{height:8px;}
+  .board::-webkit-scrollbar-thumb{background:var(--grid);border-radius:4px;}
+  .sem-col{
+    flex:0 0 240px;background:var(--paper-raised);border:1px solid var(--grid);border-radius:var(--radius);
+    display:flex;flex-direction:column;transition:border-color .15s,background .15s,opacity .15s;
+  }
+  .sem-col.dragover{border-color:var(--blueprint);background:rgba(44,92,134,.05);}
+  .sem-col.dragging{opacity:.4;}
+  .sem-col.insert-before{box-shadow:-3px 0 0 0 var(--blueprint);}
+  .sem-head{padding:11px 12px 10px;border-bottom:1px solid var(--grid);}
+  .sem-head-top{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:7px;}
+  .sem-head-right{display:flex;align-items:center;gap:4px;}
+  .sem-drag-handle{cursor:grab;color:var(--ink-soft);font-size:14px;line-height:1;padding:0 2px;user-select:none;}
+  .sem-drag-handle:hover{color:var(--blueprint);}
+  .sem-drag-handle:active{cursor:grabbing;}
+  .sem-num{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--blueprint);font-weight:700;letter-spacing:.03em;}
+  .sem-label-input{
+    font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:var(--ink);
+    border:none;background:transparent;width:100%;padding:1px 2px;border-radius:4px;
+  }
+  .sem-label-input:hover{background:var(--paper);}
+  .sem-label-input:focus{outline:1.5px solid var(--blueprint);background:var(--paper);}
+
+  /* signature element: capacity meter styled like a component charge cell */
+  .gauge-row{display:flex;align-items:center;gap:7px;}
+  .gauge{
+    flex:1;height:14px;border:1.5px solid var(--ink);border-radius:3px;position:relative;
+    background:repeating-linear-gradient(90deg, transparent 0 5px, rgba(28,43,58,.06) 5px 6px);
+    overflow:hidden;
+  }
+  .gauge::after{ /* terminal nub, battery-cell look */
+    content:'';position:absolute;right:-4px;top:3px;width:3px;height:6px;background:var(--ink);border-radius:0 2px 2px 0;
+  }
+  .gauge-fill{height:100%;background:var(--blueprint);transition:width .25s ease, background .25s ease;}
+  .gauge-fill.full{background:var(--circuit-green);}
+  .gauge-fill.over{background:var(--alert-red);}
+  .gauge-num{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--ink-soft);white-space:nowrap;}
+  .gauge-num.over{color:var(--alert-red);}
+  .sem-meta{display:flex;justify-content:space-between;align-items:center;margin-top:7px;}
+  .max-ch-edit{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--ink-soft);}
+  .max-ch-edit input{width:38px;padding:2px 3px;border:1px solid var(--grid);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:11px;text-align:center;background:var(--paper);}
+
+  .sem-body{flex:1;display:flex;flex-direction:column;gap:8px;padding:10px;min-height:120px;}
+  .sem-body .card{width:100%;}
+  .sem-drop-hint{flex:1;display:flex;align-items:center;justify-content:center;color:var(--grid);font-size:11px;border:1.5px dashed var(--grid);border-radius:6px;min-height:60px;}
+
+  .add-sem-col{
+    flex:0 0 150px;border:1.5px dashed var(--grid);border-radius:var(--radius);
+    display:flex;align-items:center;justify-content:center;color:var(--ink-soft);
+    background:transparent;font-size:13px;font-weight:600;flex-direction:column;gap:6px;
+    transition:border-color .15s,color .15s;min-height:140px;
+  }
+  .add-sem-col:hover{border-color:var(--blueprint);color:var(--blueprint-deep);}
+  .add-sem-col .plus{font-size:22px;line-height:1;font-family:'Space Grotesk',sans-serif;}
+
+  .board-empty{
+    border:1.5px dashed var(--grid);border-radius:var(--radius);padding:36px 20px;text-align:center;color:var(--ink-soft);font-size:13.5px;
+  }
+
+  /* ---------- Modal ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(28,43,58,.45);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50;}
+  .modal{background:var(--paper-raised);border-radius:var(--radius);max-width:420px;width:100%;padding:22px;box-shadow:0 18px 50px rgba(28,43,58,.3);}
+  .modal h2{font-family:'Space Grotesk',sans-serif;font-size:17px;margin:0 0 14px;color:var(--blueprint-deep);}
+  .field{margin-bottom:13px;}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:4px;}
+  .text-input{width:100%;border:1px solid var(--grid);border-radius:var(--radius-sm);padding:8px 10px;font-size:13.5px;background:var(--paper);color:var(--ink);}
+  .text-input.mono{font-family:'JetBrains Mono',monospace;}
+  .field .hint{font-size:11px;color:var(--ink-soft);margin-top:3px;}
+  .field .err{font-size:11.5px;color:var(--alert-red);margin-top:3px;display:none;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+
+  /* ---------- Toasts ---------- */
+  #toast-root{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:8px;z-index:60;}
+  .toast{
+    background:var(--ink);color:#fff;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:320px;animation:toastIn .18s ease;
+  }
+  .toast.err{background:var(--alert-red);}
+  @keyframes toastIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;animation:none !important;}
+  }
+
+  @media (max-width:640px){
+    .wrap{padding:18px 14px 48px;}
+    .hdr h1{font-size:22px;}
+    .sem-col{flex:0 0 200px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hdr">
+    <div class="hdr-title-block">
+      <div class="hdr-title">
+        <h1>Course Plan</h1>
+        <span class="tag">degree roadmap</span>
+      </div>
+      <p class="sub">Lay out the courses you still need, drag them into semesters, and keep every load under your eligible credit-hour cap.</p>
+    </div>
+    <div class="save-indicator"><span class="save-dot" id="saveDot"></span><span id="saveText">Loading…</span></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="grp">
+      <label for="defaultMaxCH">Default max CH / semester</label>
+      <input type="number" min="1" step="1" id="defaultMaxCH" class="num-input" value="18">
+    </div>
+    <button class="btn btn-sm" id="applyAllBtn">Apply to all semesters</button>
+    <div class="divider"></div>
+    <button class="btn btn-primary" id="addCourseBtn">+ Add course</button>
+    <button class="btn" id="autoPlanBtn">Auto-plan</button>
+    <div class="divider"></div>
+    <button class="btn" id="exportBtn" title="Downloads a .json file with everything in your plan, so you have your own copy outside the browser.">⬇ Export backup</button>
+    <button class="btn" id="importBtn" title="Loads a .json file you exported earlier — replaces whatever is currently in your plan.">⬆ Import backup</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none;">
+    <div class="spacer"></div>
+    <button class="btn btn-ghost" id="resetPlanBtn">Reset plan</button>
+  </div>
+
+  <div class="stats" id="statsRow"></div>
+
+  <div class="section-label">Unscheduled <span class="count" id="binCount">0</span></div>
+  <div class="bin" id="bin"></div>
+
+  <div class="section-label">Semester board</div>
+  <div class="board" id="board"></div>
+
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script>
+(function(){
+  "use strict";
+  const STORAGE_KEY = "plan-data";
+  const DEFAULTS = { defaultMaxCH: 18, courses: [], semesters: [] };
+  let state = null;
+  let saveTimer = null;
+  let dragCtx = null; // {courseId, fromSemId|null}
+
+  function genId(){
+    return 'id_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36);
+  }
+
+  // ---------------- persistence ----------------
+  // Tier 1: window.storage (works inside the Claude.ai artifact panel)
+  // Tier 2: localStorage (works when this file is downloaded and opened on its own)
+  // Tier 3: in-memory only (private/locked-down browsing, or storage genuinely blocked)
+  let backend = 'unknown';
+
+  function hasCloudStorage(){
+    return typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+  }
+  function localStorageWorks(){
+    try{
+      localStorage.setItem('__plan_probe__','1');
+      localStorage.removeItem('__plan_probe__');
+      return true;
+    } catch(e){ return false; }
+  }
+
+  function looksEmpty(parsed){
+    return !parsed || !Array.isArray(parsed.courses) || parsed.courses.length === 0;
+  }
+
+  async function load(){
+    let parsed = null;
+
+    if(hasCloudStorage()){
+      backend = 'cloud';
+      try{
+        const res = await window.storage.get(STORAGE_KEY, false);
+        if(res && res.value) parsed = JSON.parse(res.value);
+      } catch(e){ /* key doesn't exist yet — fine, parsed stays null */ }
+    } else if(localStorageWorks()){
+      backend = 'local';
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(raw) parsed = JSON.parse(raw);
+      } catch(e){ /* corrupt or missing — fine, parsed stays null */ }
+    } else {
+      backend = 'memory';
+    }
+
+    // A stored record with no courses in it (e.g. left over from before storage was
+    // working right) is treated the same as "nothing saved yet" — seed it once, not forever.
+    if(looksEmpty(parsed) && !(parsed && parsed._seeded)){
+      state = JSON.parse(JSON.stringify(DEFAULTS));
+      state._seeded = true;
+      scheduleSave(); // persist the seed immediately so this only ever happens once
+    } else {
+      state = Object.assign({}, DEFAULTS, parsed);
+    }
+  }
+
+  function scheduleSave(){
+    setSaveStatus('saving');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(doSave, 450);
+  }
+
+  async function doSave(){
+    if(backend === 'cloud'){
+      try{
+        await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
+        setSaveStatus('saved');
+        return;
+      } catch(e){
+        // cloud storage stopped working mid-session — drop down a tier instead of just failing silently
+        backend = localStorageWorks() ? 'local' : 'memory';
+      }
+    }
+    if(backend === 'local'){
+      try{
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        setSaveStatus('saved-local');
+        return;
+      } catch(e){
+        backend = 'memory';
+      }
+    }
+    setSaveStatus('memory');
+  }
+
+  function setSaveStatus(s){
+    const dot = document.getElementById('saveDot');
+    const text = document.getElementById('saveText');
+    dot.classList.remove('saving','error');
+    if(s==='saving'){ dot.classList.add('saving'); text.textContent = 'Saving…'; }
+    else if(s==='saved-local'){ text.textContent = 'Saved in this browser'; }
+    else if(s==='memory'){ dot.classList.add('error'); text.textContent = 'Not saved — will be lost when this tab closes'; }
+    else { text.textContent = 'Saved'; }
+  }
+
+  // ---------------- helpers ----------------
+  function getCourse(id){ return state.courses.find(c=>c.id===id); }
+
+  function semIndexOf(courseId){
+    for(let i=0;i<state.semesters.length;i++){
+      if(state.semesters[i].courseIds.includes(courseId)) return i;
+    }
+    return -1;
+  }
+
+  function isUnscheduled(courseId){ return semIndexOf(courseId) === -1; }
+
+  function prereqCodesOf(course){
+    return (course.prereq || '').split(',').map(s=>s.trim()).filter(Boolean);
+  }
+
+  function checkPrereqStatus(course, semIdx){
+    const codes = prereqCodesOf(course);
+    const missing = [];
+    codes.forEach(code=>{
+      const target = state.courses.find(c=>c.code.toLowerCase()===code.toLowerCase());
+      if(!target) return; // not tracked here -> assume already completed
+      const tIdx = semIndexOf(target.id);
+      if(tIdx === -1 || tIdx >= semIdx) missing.push(code);
+    });
+    return { ok: missing.length===0, missing, codes };
+  }
+
+  function semesterUsedCH(sem){
+    return sem.courseIds.reduce((sum,id)=>{
+      const c = getCourse(id);
+      return sum + (c ? c.ch : 0);
+    },0);
+  }
+
+  function toast(msg, isErr){
+    const root = document.getElementById('toast-root');
+    const el = document.createElement('div');
+    el.className = 'toast' + (isErr ? ' err' : '');
+    el.textContent = msg;
+    root.appendChild(el);
+    setTimeout(()=>{ el.remove(); }, 4200);
+  }
+
+  function escapeHtml(str){
+    return (str||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  // ---------------- mutations ----------------
+  function addCourse(data){
+    state.courses.push({ id: genId(), code: data.code, name: data.name||'', ch: data.ch, prereq: data.prereq||'' });
+    scheduleSave(); render();
+  }
+  function updateCourse(id, data){
+    const c = getCourse(id);
+    if(!c) return;
+    Object.assign(c, data);
+    scheduleSave(); render();
+  }
+  function deleteCourse(id){
+    state.courses = state.courses.filter(c=>c.id!==id);
+    state.semesters.forEach(s=>{ s.courseIds = s.courseIds.filter(cid=>cid!==id); });
+    scheduleSave(); render();
+  }
+  function addSemester(){
+    const sem = { id: genId(), label: 'Semester ' + (state.semesters.length+1), maxCH: state.defaultMaxCH, courseIds: [] };
+    state.semesters.push(sem);
+    scheduleSave(); render();
+    requestAnimationFrame(()=>{
+      const input = document.querySelector('[data-sem-label="'+sem.id+'"]');
+      if(input){ input.focus(); input.select(); }
+    });
+  }
+  function updateSemester(id, data){
+    const s = state.semesters.find(s=>s.id===id);
+    if(!s) return;
+    Object.assign(s, data);
+    scheduleSave(); render();
+  }
+  function deleteSemester(id){
+    const s = state.semesters.find(s=>s.id===id);
+    if(!s) return;
+    if(s.courseIds.length>0){
+      const ok = confirm('Move ' + s.courseIds.length + ' course(s) back to Unscheduled and delete this semester?');
+      if(!ok) return;
+    }
+    state.semesters = state.semesters.filter(x=>x.id!==id);
+    scheduleSave(); render();
+  }
+  function placeCourse(courseId, toSemId, beforeId){
+    state.semesters.forEach(s=>{ s.courseIds = s.courseIds.filter(id=>id!==courseId); });
+
+    if(toSemId){
+      const s = state.semesters.find(s=>s.id===toSemId);
+      if(s){
+        const idx = beforeId ? s.courseIds.indexOf(beforeId) : -1;
+        if(idx > -1) s.courseIds.splice(idx, 0, courseId);
+        else s.courseIds.push(courseId);
+      }
+    } else {
+      // landing in (or reordering within) the unscheduled tray — position lives in state.courses itself
+      const curIdx = state.courses.findIndex(c=>c.id===courseId);
+      if(curIdx > -1){
+        const [courseObj] = state.courses.splice(curIdx,1);
+        const beforeIdx = beforeId ? state.courses.findIndex(c=>c.id===beforeId) : -1;
+        if(beforeIdx > -1) state.courses.splice(beforeIdx,0,courseObj);
+        else state.courses.push(courseObj);
+      }
+    }
+    scheduleSave(); render();
+  }
+
+  function reorderSemester(semId, beforeSemId){
+    if(semId === beforeSemId) return;
+    const idx = state.semesters.findIndex(s=>s.id===semId);
+    if(idx === -1) return;
+    const [semObj] = state.semesters.splice(idx,1);
+    const beforeIdx = beforeSemId ? state.semesters.findIndex(s=>s.id===beforeSemId) : -1;
+    if(beforeIdx > -1) state.semesters.splice(beforeIdx,0,semObj);
+    else state.semesters.push(semObj);
+    scheduleSave(); render();
+  }
+
+  // Find the existing card in `container` whose position the dragged item should land before,
+  // based on where the cursor currently is. Works for both a single vertical column (semester
+  // body) and a wrapped horizontal tray (unscheduled bin) by comparing same-row X or cross-row Y.
+  function getDragAfterElement(container, x, y){
+    const els = [...container.querySelectorAll('.card:not(.dragging)')];
+    let closest = null, closestDist = Infinity;
+    els.forEach(el=>{
+      const box = el.getBoundingClientRect();
+      const cx = box.left + box.width/2, cy = box.top + box.height/2;
+      const dist = Math.hypot(x-cx, y-cy);
+      if(dist < closestDist){ closestDist = dist; closest = el; }
+    });
+    if(!closest) return null;
+    const box = closest.getBoundingClientRect();
+    const cx = box.left + box.width/2, cy = box.top + box.height/2;
+    const sameRow = Math.abs(y-cy) < box.height/2;
+    const after = sameRow ? (x > cx) : (y > cy);
+    let ref = after ? closest.nextElementSibling : closest;
+    while(ref && ref.classList && ref.classList.contains('dragging')) ref = ref.nextElementSibling;
+    return ref;
+  }
+
+  // Same idea, one dimension, for reordering semester columns left-to-right.
+  function getHorizontalDragAfterElement(container, x){
+    const cols = [...container.querySelectorAll('.sem-col:not(.dragging)')];
+    return cols.reduce((closest, col)=>{
+      const box = col.getBoundingClientRect();
+      const offset = x - box.left - box.width/2;
+      if(offset < 0 && offset > closest.offset) return { offset, element: col };
+      return closest;
+    }, { offset:-Infinity, element:null }).element;
+  }
+
+  function clearInsertMarkers(){
+    document.querySelectorAll('.insert-before').forEach(el=>el.classList.remove('insert-before'));
+  }
+
+  function resetPlan(){
+    if(state.semesters.every(s=>s.courseIds.length===0)){ toast('Nothing scheduled yet.'); return; }
+    const ok = confirm('Move every scheduled course back to Unscheduled? Your course list and semesters stay.');
+    if(!ok) return;
+    state.semesters.forEach(s=>{ s.courseIds = []; });
+    scheduleSave(); render();
+  }
+
+  function autoPlan(){
+    const unscheduledIds = new Set(state.courses.filter(c=>isUnscheduled(c.id)).map(c=>c.id));
+    if(unscheduledIds.size===0){ toast('Every course is already scheduled.'); return; }
+
+    let semIndex = 0;
+    let placedTotal = 0;
+    let newSemesters = 0;
+    let guard = 0;
+
+    while(unscheduledIds.size > 0){
+      guard++;
+      if(guard > 500){ toast('Auto-plan stopped — check for a prerequisite cycle.', true); break; }
+
+      if(semIndex >= state.semesters.length){
+        state.semesters.push({ id: genId(), label: 'Semester ' + (state.semesters.length+1), maxCH: state.defaultMaxCH, courseIds: [] });
+        newSemesters++;
+      }
+      const sem = state.semesters[semIndex];
+      let remaining = sem.maxCH - semesterUsedCH(sem);
+
+      const ready = state.courses.filter(c => unscheduledIds.has(c.id) && checkPrereqStatus(c, semIndex).ok);
+
+      if(ready.length === 0){
+        if(semesterUsedCH(sem) === 0 && sem.courseIds.length === 0){
+          // a completely empty semester can't start anything -> real deadlock
+          const stuck = state.courses.filter(c=>unscheduledIds.has(c.id)).map(c=>c.code).join(', ');
+          toast('Auto-plan stuck on a prerequisite cycle or missing reference: ' + stuck, true);
+          break;
+        }
+        semIndex++;
+        continue;
+      }
+
+      ready.sort((a,b)=> b.ch - a.ch); // first-fit-decreasing to use capacity efficiently
+      for(const c of ready){
+        if(remaining <= 0) break;
+        if(c.ch <= remaining){
+          sem.courseIds.push(c.id);
+          unscheduledIds.delete(c.id);
+          remaining -= c.ch;
+          placedTotal++;
+        }
+      }
+      semIndex++;
+    }
+
+    scheduleSave(); render();
+    if(placedTotal>0){
+      toast('Auto-plan scheduled ' + placedTotal + ' course(s)' + (newSemesters>0 ? ' across ' + newSemesters + ' new semester(s).' : '.'));
+    }
+  }
+
+  // ---------------- rendering ----------------
+  function render(){
+    renderStats();
+    renderBin();
+    renderBoard();
+  }
+
+  function renderStats(){
+    const totalCourses = state.courses.length;
+    const totalCH = state.courses.reduce((s,c)=>s+c.ch,0);
+    const unscheduled = state.courses.filter(c=>isUnscheduled(c.id));
+    const unscheduledCH = unscheduled.reduce((s,c)=>s+c.ch,0);
+    let issues = 0;
+    state.semesters.forEach((s,i)=>{
+      s.courseIds.forEach(cid=>{
+        const c = getCourse(cid);
+        if(c && !checkPrereqStatus(c,i).ok) issues++;
+      });
+      if(semesterUsedCH(s) > s.maxCH) issues++;
+    });
+
+    const root = document.getElementById('statsRow');
+    root.innerHTML = `
+      <div class="stat"><span class="v">${totalCourses}</span><span class="l">Courses total</span></div>
+      <div class="stat"><span class="v">${totalCH}</span><span class="l">Total CH</span></div>
+      <div class="stat"><span class="v">${unscheduled.length}</span><span class="l">Unscheduled</span></div>
+      <div class="stat"><span class="v">${unscheduledCH}</span><span class="l">Unscheduled CH</span></div>
+      <div class="stat"><span class="v">${state.semesters.length}</span><span class="l">Semesters planned</span></div>
+      <div class="stat ${issues>0?'warn':''}"><span class="v">${issues}</span><span class="l">Issues to fix</span></div>
+    `;
+  }
+
+  function cardHtml(course, semIdx /* null if in bin */){
+    const status = semIdx===null ? {ok:true, missing:[]} : checkPrereqStatus(course, semIdx);
+    const codes = prereqCodesOf(course);
+    let prereqLine = '';
+    if(codes.length){
+      const label = semIdx===null ? ('needs ' + codes.join(', ')) :
+        (status.ok ? 'prereq satisfied' : 'missing: ' + status.missing.join(', '));
+      prereqLine = `<div class="prereq-line"><span class="dot"></span><span>${escapeHtml(label)}</span></div>`;
+    }
+    const issueClass = (semIdx!==null && !status.ok) ? ' issue' : '';
+    return `
+      <div class="card${semIdx===null?' bin-card':''}${issueClass}" draggable="true" data-course-id="${course.id}" title="${codes.length? 'Prerequisite(s): '+escapeHtml(codes.join(', ')) : 'No prerequisite'}">
+        <div class="card-actions">
+          <button class="icon-btn edit-course" data-id="${course.id}" title="Edit" aria-label="Edit ${escapeHtml(course.code)}">✎</button>
+          <button class="icon-btn del del-course" data-id="${course.id}" title="Delete" aria-label="Delete ${escapeHtml(course.code)}">✕</button>
+        </div>
+        <div class="row1"><span class="code">${escapeHtml(course.code)}</span><span class="ch">${course.ch} CH</span></div>
+        ${course.name ? `<div class="name">${escapeHtml(course.name)}</div>` : ''}
+        ${prereqLine}
+      </div>`;
+  }
+
+  function renderBin(){
+    const bin = document.getElementById('bin');
+    const unscheduled = state.courses.filter(c=>isUnscheduled(c.id));
+    document.getElementById('binCount').textContent = unscheduled.length;
+    bin.innerHTML = unscheduled.length
+      ? unscheduled.map(c=>cardHtml(c,null)).join('')
+      : `<div class="bin-empty">Nothing waiting — add a course or everything's scheduled.</div>`;
+    attachCardEvents(bin);
+    bin.addEventListener('dragover', e=>{
+      if(!dragCtx || dragCtx.type!=='course') return;
+      e.preventDefault();
+      bin.classList.add('dragover');
+      clearInsertMarkers();
+      const refEl = getDragAfterElement(bin, e.clientX, e.clientY);
+      if(refEl) refEl.classList.add('insert-before');
+    });
+    bin.addEventListener('dragleave', ()=> bin.classList.remove('dragover'));
+    bin.addEventListener('drop', e=>{
+      if(!dragCtx || dragCtx.type!=='course') return;
+      e.preventDefault();
+      bin.classList.remove('dragover');
+      const refEl = getDragAfterElement(bin, e.clientX, e.clientY);
+      placeCourse(dragCtx.courseId, null, refEl ? refEl.dataset.courseId : null);
+      dragCtx = null;
+    });
+  }
+
+  function renderBoard(){
+    const board = document.getElementById('board');
+    if(state.semesters.length===0 && state.courses.length===0){
+      board.innerHTML = `<div class="board-empty">Add your remaining courses above, then add a semester to start placing them.</div>` + addSemBtnHtml();
+      attachBoardEvents();
+      return;
+    }
+    let html = '';
+    state.semesters.forEach((sem, idx)=>{
+      const used = semesterUsedCH(sem);
+      const over = used > sem.maxCH;
+      const full = used === sem.maxCH;
+      const pct = sem.maxCH>0 ? Math.min(100, (used/sem.maxCH)*100) : 0;
+      const numStr = String(idx+1).padStart(2,'0');
+      html += `
+      <div class="sem-col" data-sem-id="${sem.id}">
+        <div class="sem-head">
+          <div class="sem-head-top">
+            <span class="sem-num">SEM ${numStr}</span>
+            <div class="sem-head-right">
+              <span class="sem-drag-handle" draggable="true" data-sem-drag="${sem.id}" title="Drag to reorder this semester" aria-label="Reorder ${escapeHtml(sem.label)}">⠿</span>
+              <button class="icon-btn del del-sem" data-id="${sem.id}" title="Delete semester" aria-label="Delete ${escapeHtml(sem.label)}">✕</button>
+            </div>
+          </div>
+          <input class="sem-label-input" data-sem-label="${sem.id}" data-id="${sem.id}" value="${escapeHtml(sem.label)}" aria-label="Semester name">
+          <div class="gauge-row" style="margin-top:7px;">
+            <div class="gauge"><div class="gauge-fill ${over?'over':(full?'full':'')}" style="width:${pct}%"></div></div>
+            <span class="gauge-num ${over?'over':''}">${used}/${sem.maxCH}</span>
+          </div>
+          <div class="sem-meta">
+            <span class="max-ch-edit">max <input type="number" min="1" data-maxch="${sem.id}" value="${sem.maxCH}" aria-label="Max credit hours for ${escapeHtml(sem.label)}"> CH</span>
+            ${over ? `<span style="color:var(--alert-red);font-size:11px;font-weight:600;">+${used-sem.maxCH} over</span>` : ''}
+          </div>
+        </div>
+        <div class="sem-body" data-sem-drop="${sem.id}">
+          ${sem.courseIds.length ? sem.courseIds.map(cid=>{ const c=getCourse(cid); return c? cardHtml(c, idx) : ''; }).join('') : '<div class="sem-drop-hint">drop courses here</div>'}
+        </div>
+      </div>`;
+    });
+    html += addSemBtnHtml();
+    board.innerHTML = html;
+    attachBoardEvents();
+  }
+
+  function addSemBtnHtml(){
+    return `<button class="add-sem-col" id="addSemBtn"><span class="plus">+</span>Add semester</button>`;
+  }
+
+  // ---------------- modal ----------------
+  function openCourseModal(existingId){
+    const existing = existingId ? getCourse(existingId) : null;
+    const root = document.getElementById('modal-root');
+    const codeList = state.courses.filter(c=>!existing || c.id!==existing.id).map(c=>`<option value="${escapeHtml(c.code)}">`).join('');
+    root.innerHTML = `
+      <div class="overlay" id="overlay">
+        <div class="modal" role="dialog" aria-modal="true">
+          <h2>${existing ? 'Edit course' : 'Add course'}</h2>
+          <div class="field">
+            <label for="f-code">Course code</label>
+            <input class="text-input mono" id="f-code" value="${existing?escapeHtml(existing.code):''}" placeholder="e.g. MEC2103">
+            <div class="err" id="err-code">That code is already in your list.</div>
+          </div>
+          <div class="field">
+            <label for="f-name">Name <span style="font-weight:400;color:var(--ink-soft);">(optional)</span></label>
+            <input class="text-input" id="f-name" value="${existing?escapeHtml(existing.name):''}" placeholder="e.g. Control Systems II">
+          </div>
+          <div class="field">
+            <label for="f-ch">Credit hours</label>
+            <input class="text-input mono" id="f-ch" type="number" min="0.5" step="0.5" value="${existing?existing.ch:''}" placeholder="2">
+          </div>
+          <div class="field">
+            <label for="f-prereq">Prerequisite(s)</label>
+            <input class="text-input mono" id="f-prereq" list="course-codes" value="${existing?escapeHtml(existing.prereq):''}" placeholder="e.g. MEC2101, MEC2002">
+            <datalist id="course-codes">${codeList}</datalist>
+            <div class="hint">Comma-separate codes for more than one. If a code isn't in your list, it's assumed already completed.</div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn" id="cancelModal">Cancel</button>
+            <button class="btn btn-primary" id="saveModal">${existing?'Save changes':'Add course'}</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('f-code').focus();
+
+    function close(){
+      root.innerHTML = '';
+      document.removeEventListener('keydown', escHandler);
+    }
+    function escHandler(e){ if(e.key==='Escape') close(); }
+    document.getElementById('cancelModal').onclick = close;
+    document.getElementById('overlay').addEventListener('click', e=>{ if(e.target.id==='overlay') close(); });
+    document.addEventListener('keydown', escHandler);
+
+    document.getElementById('saveModal').onclick = ()=>{
+      const code = document.getElementById('f-code').value.trim();
+      const name = document.getElementById('f-name').value.trim();
+      const chRaw = document.getElementById('f-ch').value.trim();
+      const prereq = document.getElementById('f-prereq').value.trim();
+      const ch = parseFloat(chRaw);
+
+      document.getElementById('err-code').style.display = 'none';
+      if(!code){ document.getElementById('f-code').focus(); return; }
+      const dup = state.courses.some(c => c.code.toLowerCase()===code.toLowerCase() && (!existing || c.id!==existing.id));
+      if(dup){ document.getElementById('err-code').style.display='block'; return; }
+      if(!chRaw || isNaN(ch) || ch<=0){ document.getElementById('f-ch').focus(); return; }
+
+      if(existing){ updateCourse(existing.id, {code, name, ch, prereq}); }
+      else { addCourse({code, name, ch, prereq}); }
+      close();
+    };
+  }
+
+  // ---------------- event wiring ----------------
+  function attachBoardEvents(){
+    document.querySelectorAll('.del-sem').forEach(btn=>{
+      btn.onclick = ()=> deleteSemester(btn.dataset.id);
+    });
+    document.querySelectorAll('[data-sem-label]').forEach(inp=>{
+      inp.addEventListener('blur', ()=>{
+        const v = inp.value.trim() || 'Semester';
+        const id = inp.dataset.id;
+        const sem = state.semesters.find(s=>s.id===id);
+        if(sem && sem.label !== v){ updateSemester(id, {label:v}); }
+      });
+      inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ inp.blur(); } });
+    });
+    document.querySelectorAll('[data-maxch]').forEach(inp=>{
+      inp.addEventListener('blur', ()=>{
+        const v = parseFloat(inp.value);
+        const id = inp.dataset.maxch;
+        if(!isNaN(v) && v>0){ updateSemester(id, {maxCH:v}); }
+        else { render(); }
+      });
+      inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ inp.blur(); } });
+    });
+    const addSemBtn = document.getElementById('addSemBtn');
+    if(addSemBtn) addSemBtn.onclick = addSemester;
+
+    attachCardEvents(document.getElementById('board'));
+
+    document.querySelectorAll('[data-sem-drop]').forEach(zone=>{
+      zone.addEventListener('dragover', e=>{
+        if(!dragCtx || dragCtx.type!=='course') return;
+        e.preventDefault();
+        zone.closest('.sem-col').classList.add('dragover');
+        clearInsertMarkers();
+        const refEl = getDragAfterElement(zone, e.clientX, e.clientY);
+        if(refEl) refEl.classList.add('insert-before');
+      });
+      zone.addEventListener('dragleave', ()=> zone.closest('.sem-col').classList.remove('dragover'));
+      zone.addEventListener('drop', e=>{
+        if(!dragCtx || dragCtx.type!=='course') return;
+        e.preventDefault();
+        zone.closest('.sem-col').classList.remove('dragover');
+        const refEl = getDragAfterElement(zone, e.clientX, e.clientY);
+        placeCourse(dragCtx.courseId, zone.dataset.semDrop, refEl ? refEl.dataset.courseId : null);
+        dragCtx = null;
+      });
+    });
+
+    document.querySelectorAll('.sem-drag-handle').forEach(handle=>{
+      handle.addEventListener('dragstart', e=>{
+        dragCtx = { type:'sem', semId: handle.dataset.semDrag };
+        handle.closest('.sem-col').classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', handle.dataset.semDrag);
+      });
+      handle.addEventListener('dragend', ()=>{
+        const col = handle.closest('.sem-col');
+        if(col) col.classList.remove('dragging');
+        clearInsertMarkers();
+      });
+    });
+  }
+
+  function attachCardEvents(scope){
+    scope.querySelectorAll('.card').forEach(card=>{
+      card.addEventListener('dragstart', e=>{
+        dragCtx = { type:'course', courseId: card.dataset.courseId };
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', card.dataset.courseId);
+      });
+      card.addEventListener('dragend', ()=>{
+        card.classList.remove('dragging');
+        clearInsertMarkers();
+      });
+    });
+    scope.querySelectorAll('.edit-course').forEach(btn=>{
+      btn.onclick = (e)=>{ e.stopPropagation(); openCourseModal(btn.dataset.id); };
+    });
+    scope.querySelectorAll('.del-course').forEach(btn=>{
+      btn.onclick = (e)=>{
+        e.stopPropagation();
+        const c = getCourse(btn.dataset.id);
+        if(c && confirm('Delete ' + c.code + '? This removes it from your plan.')) deleteCourse(btn.dataset.id);
+      };
+    });
+  }
+
+  // Board-level listener for reordering semester columns themselves — attached once since
+  // #board itself is a stable element across re-renders (only its innerHTML changes).
+  function setupBoardReorder(){
+    const board = document.getElementById('board');
+    board.addEventListener('dragover', e=>{
+      if(!dragCtx || dragCtx.type!=='sem') return;
+      e.preventDefault();
+      const afterEl = getHorizontalDragAfterElement(board, e.clientX);
+      document.querySelectorAll('.sem-col.insert-before').forEach(el=>el.classList.remove('insert-before'));
+      if(afterEl) afterEl.classList.add('insert-before');
+    });
+    board.addEventListener('drop', e=>{
+      if(!dragCtx || dragCtx.type!=='sem') return;
+      e.preventDefault();
+      const afterEl = getHorizontalDragAfterElement(board, e.clientX);
+      reorderSemester(dragCtx.semId, afterEl ? afterEl.dataset.semId : null);
+      dragCtx = null;
+    });
+  }
+
+  // ---------------- static controls ----------------
+  function setupStaticListeners(){
+    setupBoardReorder();
+    const defInput = document.getElementById('defaultMaxCH');
+    defInput.value = state.defaultMaxCH;
+    defInput.addEventListener('blur', ()=>{
+      const v = parseFloat(defInput.value);
+      if(!isNaN(v) && v>0){ state.defaultMaxCH = v; scheduleSave(); }
+      else { defInput.value = state.defaultMaxCH; }
+    });
+    defInput.addEventListener('keydown', e=>{ if(e.key==='Enter') defInput.blur(); });
+
+    document.getElementById('applyAllBtn').onclick = ()=>{
+      state.semesters.forEach(s=> s.maxCH = state.defaultMaxCH);
+      scheduleSave(); render();
+      toast('Applied ' + state.defaultMaxCH + ' CH to all semesters.');
+    };
+    document.getElementById('addCourseBtn').onclick = ()=> openCourseModal(null);
+    document.getElementById('autoPlanBtn').onclick = autoPlan;
+    document.getElementById('resetPlanBtn').onclick = resetPlan;
+
+    document.getElementById('exportBtn').onclick = exportBackup;
+    const importFileInput = document.getElementById('importFile');
+    document.getElementById('importBtn').onclick = ()=> importFileInput.click();
+    importFileInput.addEventListener('change', e=>{
+      const file = e.target.files[0];
+      if(file) importBackup(file);
+      importFileInput.value = '';
+    });
+  }
+
+  function exportBackup(){
+    const payload = { defaultMaxCH: state.defaultMaxCH, courses: state.courses, semesters: state.semesters };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = 'course-plan-backup-' + stamp + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast('Backup downloaded — keep it somewhere safe.');
+  }
+
+  function importBackup(file){
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      let parsed;
+      try{ parsed = JSON.parse(reader.result); }
+      catch(e){ toast('That file isn\'t valid backup JSON.', true); return; }
+      if(!parsed || !Array.isArray(parsed.courses) || !Array.isArray(parsed.semesters)){
+        toast('That file doesn\'t look like a course-plan backup.', true); return;
+      }
+      const ok = confirm('Import this backup? It will replace everything currently in your plan.');
+      if(!ok) return;
+      state = {
+        defaultMaxCH: parsed.defaultMaxCH || DEFAULTS.defaultMaxCH,
+        courses: parsed.courses,
+        semesters: parsed.semesters,
+        _seeded: true
+      };
+      scheduleSave(); render();
+      document.getElementById('defaultMaxCH').value = state.defaultMaxCH;
+      toast('Backup imported.');
+    };
+    reader.onerror = ()=> toast('Could not read that file.', true);
+    reader.readAsText(file);
+  }
+
+  // ---------------- init ----------------
+  (async function init(){
+    await load();
+    setupStaticListeners();
+    render();
+    if(backend === 'cloud') setSaveStatus('saved');
+    else if(backend === 'local') setSaveStatus('saved-local');
+    else setSaveStatus('memory');
+  })();
+})();
+</script>
+</body>
+</html>
