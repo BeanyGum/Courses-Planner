@@ -25,7 +25,4 @@ Everything you enter is stored **only in your own browser** (`localStorage`), sc
 
 - Data doesn't sync between browsers or devices automatically — use **Export backup** / **Import backup** to move it.
 - Clearing your browser's site data for this page will clear your plan too (export a backup first if that matters to you).
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+- 
