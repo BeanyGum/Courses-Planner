@@ -26,3 +26,19 @@ Everything you enter is stored **only in your own browser** (`localStorage`), sc
 - Data doesn't sync between browsers or devices automatically — use **Export backup** / **Import backup** to move it.
 - Clearing your browser's site data for this page will clear your plan too (export a backup first if that matters to you).
 
+## License
+
+Course Plan is **free for individual personal use** — download it, run
+it, modify your own copy, use it to plan your own degree.
+
+**Organizational use requires a commercial license.** This includes
+universities, schools, businesses, nonprofits, or any group deploying
+Course Plan for others to use (e.g. hosting it on a university website
+or student dashboard) — even if it's offered to students for free.
+
+See [LICENSE](LICENSE) for full terms and
+[COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) for how to request a
+commercial agreement. Contributing? See [CONTRIBUTING.md](CONTRIBUTING.md)
+first.
+
+For commercial licensing inquiries: hassaneinanasm@outlook.com
